@@ -3,41 +3,35 @@ const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const mongoose = require('mongoose');
 const keys = require('../config/keys');
 
-// create a collection by using a model i.e sellers.
-const Seller = mongoose.model('sellers');
+const User = mongoose.model('users');
 
 passport.serializeUser((user, done) => {
-	done(null, user.id); // user.id is mongose record id
+  done(null, user.id);
 });
 
 passport.deserializeUser((id, done) => {
-	Seller.findById(id).then(user => {
-		done(null, user);
-	});
+  User.findById(id).then(user => {
+    done(null, user);
+  });
 });
 
 passport.use(
-	new GoogleStrategy(
-		{
-			clientID: keys.googleclientID,
-			clientSecret: keys.googleClientSecret,
-			callbackURL: '/auth/google/callback'
-		},
-		(accessToken, refreshToken, profile, done) => {
-			Seller.findOne({ googleId: profile.id }).then(existingUser => {
-				if (existingUser) {
-					// already have a user record in DB
-					done(null, existingUser);
-				} else {
-					//crate a new instant of sellers
-					new Seller({
-						googleId: profile.id,
-						googleDisplayName: profile.displayName
-					})
-						.save()
-						.then(user => done(null, user));
-				}
-			});
-		}
-	)
+  new GoogleStrategy(
+    {
+      clientID: keys.googleClientID,
+      clientSecret: keys.googleClientSecret,
+      callbackURL: '/auth/google/callback',
+      proxy: true
+    },
+    async (accessToken, refreshToken, profile, done) => {
+      const existingUser = await User.findOne({ googleId: profile.id });
+
+      if (existingUser) {
+        return done(null, existingUser);
+      }
+
+      const user = await new User({ googleId: profile.id }).save();
+      done(null, user);
+    }
+  )
 );
